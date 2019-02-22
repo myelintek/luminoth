@@ -292,7 +292,7 @@ class FasterRCNN(snt.AbstractModule):
                 axis=0
             )
 
-            shifts = tf.transpose(shifts)
+            shifts = tf.transpose(shifts, perm=[1, 0])
             # Shifts now is a (H x W, 4) Tensor
 
             # Expand dims to use broadcasting sum.
