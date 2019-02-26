@@ -36,7 +36,9 @@ class PredictorNetwork(object):
         model = model_class(config)
 
         graph = tf.Graph()
-        self.session = tf.Session(graph=graph)
+        tf_config = tf.ConfigProto()
+        tf_config.gpu_options.allow_growth = True
+        self.session = tf.Session(config=tf_config, graph=graph)
 
         with graph.as_default():
             self.image_placeholder = tf.placeholder(
