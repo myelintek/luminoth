@@ -336,6 +336,7 @@ class YoloV3(snt.AbstractModule):
         # get xy coordinates in one cell from the feature_map
         # numerical range: 0 ~ 1
         # shape: [N, 13, 13, 3, 2]
+        
         true_xy = y_true[..., 0:2] / ratio[::-1] - x_y_offset
         pred_xy = pred_box_xy      / ratio[::-1] - x_y_offset
 
@@ -384,6 +385,13 @@ class YoloV3(snt.AbstractModule):
         # pred_box_??: [N, 13, 13, 3, 2]
 
         # shape: [N, 13, 13, 3, 1, 2]
+        print(true_box_xy.dtype)
+        print(tf.float32)
+        if true_box_xy.dtype != tf.float32:
+            true_box_xy = tf.dtypes.cast(true_box_xy, dtype=tf.float32)
+        if true_box_wh.dtype != tf.float32:
+            true_box_wh = tf.dtypes.cast(true_box_wh, dtype=tf.float32)
+
         pred_box_xy = tf.expand_dims(pred_box_xy, -2)
         pred_box_wh = tf.expand_dims(pred_box_wh, -2)
 
