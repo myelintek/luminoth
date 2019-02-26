@@ -1,0 +1,18 @@
+train:
+  # Run name for the training session.
+  run_name: my-run
+  # Directory in which model checkpoints & summaries (for Tensorboard) will be saved.
+  job_dir: jobs/
+
+dataset:
+  type: object_detection
+  # From which directory to read the dataset.
+  dir: /dataset/coco/
+
+model:
+  type: yolov3
+  network:
+#    anchors: [(10, 13), (16, 30), (33, 23), (30, 61), (62, 45), (59, 119), (116, 90), (156, 198), (373, 326)]
+    batch_norm_decay: 0.9
+    leaky_relu: 0.1
+    num_classes: 80

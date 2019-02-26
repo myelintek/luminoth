@@ -1,11 +1,12 @@
 from luminoth.models.fasterrcnn import FasterRCNN
 from luminoth.models.ssd import SSD
-
+from luminoth.models.yolov3 import YoloV3
 
 # TODO: More models :)
 MODELS = {
     'fasterrcnn': FasterRCNN,
-    'ssd': SSD
+    'ssd': SSD,
+    'yolov3': YoloV3
 }
 
 
