@@ -3,7 +3,7 @@ train:
   debug: False
   # Seed for random operations.
   seed:
-  batch_size: 8
+  batch_size: 1
   # Base directory in which model checkpoints & summaries (for Tensorboard) will
   # be saved.
   job_dir: jobs/
@@ -38,7 +38,7 @@ train:
   # The frequency, in seconds, that the summaries are written to disk.  If both
   # save_summaries_steps and save_summaries_secs are set to empty, then the
   # default summary saver isn't used.
-  save_summaries_secs: 30
+  save_summaries_secs: 
   # Run TensorFlow using full_trace mode for memory and running time logging
   # Debug mode must be enabled.
   full_trace: False
