@@ -53,7 +53,7 @@ train:
     # exponential_decay, polynomial_decay) You can define different decay
     # methods using `decay_method` and defining all the necessary arguments.
     decay_method:
-    learning_rate: 0.0003
+    learning_rate: 0.000001
 
   # Optimizer configuration.
   optimizer:

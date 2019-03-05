@@ -1,5 +1,6 @@
 import sonnet as snt
 import tensorflow as tf
+import numpy as np
 
 slim = tf.contrib.slim
 
@@ -172,25 +173,18 @@ class YoloV3(snt.AbstractModule):
         :param reuse: whether or not the network and its variables should be reused.
         :return:
         """
-        # it will be needed later on
-        #self.img_size = tf.shape(inputs)[1:3]
-        #print("inputs*******************************")
-        #print(inputs)
-        #print("y_true*******************************")
-        y_true = tf.dtypes.cast(y_true, tf.float32)
 
-        #print(y_true)
+        y_true = tf.dtypes.cast(y_true, tf.float32)
+        y_true = tf.reshape(y_true, shape=[-1,5])
+
         self.img_size = tf.constant(list(self.image_shape))
-        #print("img_size*****************************")
-        #print(self.img_size)
         # [N H W C]
         self.image_shape.append(3)  # Add channels to shape
         inputs.set_shape(self.image_shape)
         # [HWC] to [N H W C]
         inputs = tf.expand_dims(inputs, 0, name='hardcode_batch_size_to_1')
-
-        #print("inputs after************************")
-        #print(inputs)
+        inputs, y_true_13, y_true_26, y_true_52 = self.preprocess(inputs, y_true)
+        y_true = [y_true_13, y_true_26, y_true_52]
         # set batch norm params
         batch_norm_params = {
             'decay': self._BATCH_NORM_DECAY,
@@ -469,16 +463,12 @@ class YoloV3(snt.AbstractModule):
         return None #TODO
 
     def preprocess(self, image, gt_boxes):
-        # resize_image_correct_bbox
-        image, gt_boxes = self.resize_image_correct_bbox(image, gt_boxes, self.image_shape[0], self.image_shape[1])
-        if self.debug: return image, gt_boxes
-
         y_true_13, y_true_26, y_true_52 = tf.py_func(self.preprocess_true_boxes, inp=[gt_boxes],
                             Tout = [tf.float32, tf.float32, tf.float32])
         # data augmentation
         # pass
         image = image / 255.
-
+        
         return image, y_true_13, y_true_26, y_true_52
 
     def preprocess_true_boxes(self, gt_boxes):
@@ -499,7 +489,7 @@ class YoloV3(snt.AbstractModule):
                             13:cell szie, 3:number of anchors
                             85: box_centers, box_sizes, confidence, probability
         """
-        num_layers = len(self.anchors) // 3
+        num_layers = len(self._ANCHORS) // 3
         anchor_mask = [[6,7,8], [3,4,5], [0,1,2]] if num_layers==3 else [[3,4,5], [1,2,3]]
         grid_sizes = [[self.image_shape[0]//x, self.image_shape[1]//x] for x in (32, 16, 8)]
 
@@ -509,12 +499,13 @@ class YoloV3(snt.AbstractModule):
         gt_boxes[:, 0:2] = box_centers
         gt_boxes[:, 2:4] = box_sizes
 
-        y_true_13 = np.zeros(shape=[grid_sizes[0][0], grid_sizes[0][1], 3, 5+self.num_classes], dtype=np.float32)
-        y_true_26 = np.zeros(shape=[grid_sizes[1][0], grid_sizes[1][1], 3, 5+self.num_classes], dtype=np.float32)
-        y_true_52 = np.zeros(shape=[grid_sizes[2][0], grid_sizes[2][1], 3, 5+self.num_classes], dtype=np.float32)
+        y_true_13 = np.zeros(shape=[grid_sizes[0][0], grid_sizes[0][1], 3, 5+self._NUM_CLASSES], dtype=np.float32)
+        y_true_26 = np.zeros(shape=[grid_sizes[1][0], grid_sizes[1][1], 3, 5+self._NUM_CLASSES], dtype=np.float32)
+        y_true_52 = np.zeros(shape=[grid_sizes[2][0], grid_sizes[2][1], 3, 5+self._NUM_CLASSES], dtype=np.float32)
 
         y_true = [y_true_13, y_true_26, y_true_52]
-        anchors_max =  self._ANCHORS / 2.
+        anchors = np.asarray(self._ANCHORS)
+        anchors_max =  anchors / 2.
         anchors_min = -anchors_max
         valid_mask = box_sizes[:, 0] > 0
 
@@ -532,32 +523,28 @@ class YoloV3(snt.AbstractModule):
         intersect_area = intersect_wh[..., 0] * intersect_wh[..., 1]
         box_area       = wh[..., 0] * wh[..., 1]
 
-        anchor_area = self.anchors[:, 0] * self.anchors[:, 1]
+        anchor_area = anchors[:, 0] * anchors[:, 1]
         iou = intersect_area / (box_area + anchor_area - intersect_area)
         # Find best anchor for each true box
         best_anchor = np.argmax(iou, axis=-1)
-
         for t, n in enumerate(best_anchor):
             for l in range(num_layers):
                 if n not in anchor_mask[l]: continue
 
-                i = np.floor(gt_boxes[t,0]/self.image_w*grid_sizes[l][1]).astype('int32')
-                j = np.floor(gt_boxes[t,1]/self.image_h*grid_sizes[l][0]).astype('int32')
-
+                i = np.floor(gt_boxes[t,0]/self.image_shape[1]*grid_sizes[l][1]).astype('int32')
+                j = np.floor(gt_boxes[t,1]/self.image_shape[0]*grid_sizes[l][0]).astype('int32')
                 k = anchor_mask[l].index(n)
                 c = gt_boxes[t, 4].astype('int32')
-
                 y_true[l][j, i, k, 0:4] = gt_boxes[t, 0:4]
                 y_true[l][j, i, k,   4] = 1.
                 y_true[l][j, i, k, 5+c] = 1.
 
         return y_true_13, y_true_26, y_true_52
 
-    def resize_image_correct_bbox(image, boxes, image_h, image_w):
+    def resize_image_correct_bbox(self, image, boxes, image_h, image_w):
 
         origin_image_size = tf.to_float(tf.shape(image)[0:2])
         image = tf.image.resize_images(image, size=[image_h, image_w])
-
         # correct bbox
         xx1 = boxes[:, 0] * image_w / origin_image_size[1]
         yy1 = boxes[:, 1] * image_h / origin_image_size[0]
